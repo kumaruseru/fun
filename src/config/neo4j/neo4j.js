@@ -13,13 +13,20 @@ class Neo4jConfig {
     this.password = process.env.NEO4J_PASSWORD;
     this.database = process.env.NEO4J_DATABASE || 'neo4j';
     
+    // Determine encryption from URI and create appropriate config
+    const isEncryptedUri = this.uri && (this.uri.startsWith('neo4j+s://') || this.uri.startsWith('bolt+s://'));
+    
     this.config = {
       maxConnectionLifetime: 3 * 60 * 60 * 1000, // 3 hours
       maxConnectionPoolSize: 50,
       connectionAcquisitionTimeout: 2 * 60 * 1000, // 2 minutes
-      disableLosslessIntegers: true,
-      encrypted: this.uri.startsWith('neo4j+s://') ? 'ENCRYPTION_ON' : 'ENCRYPTION_OFF'
+      disableLosslessIntegers: true
     };
+    
+    // Only add encryption config if not specified in URI
+    if (!isEncryptedUri && this.uri && !this.uri.includes('+s://')) {
+      this.config.encrypted = 'ENCRYPTION_OFF';
+    }
   }
 
   /**
@@ -28,14 +35,30 @@ class Neo4jConfig {
    */
   createDriver() {
     try {
+      // Skip Neo4j if URI is not configured
+      if (!this.uri || !this.username || !this.password) {
+        console.log('⚠️ Neo4j not configured, skipping...');
+        return null;
+      }
+
       const auth = neo4j.auth.basic(this.username, this.password);
-      const driver = neo4j.driver(this.uri, auth, this.config);
+      
+      // Create minimal config to avoid conflicts
+      const minimalConfig = {
+        maxConnectionLifetime: 3 * 60 * 60 * 1000,
+        maxConnectionPoolSize: 50,
+        connectionAcquisitionTimeout: 2 * 60 * 1000,
+        disableLosslessIntegers: true
+      };
+      
+      const driver = neo4j.driver(this.uri, auth, minimalConfig);
       
       console.log('✅ Neo4j driver created successfully');
       return driver;
     } catch (error) {
       console.error('❌ Neo4j driver creation failed:', error.message);
-      throw error;
+      console.log('⚠️ Continuing without Neo4j...');
+      return null;
     }
   }
 

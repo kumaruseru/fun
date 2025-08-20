@@ -8,6 +8,7 @@ const MessageEncryption = require('./encryption/MessageEncryption');
 const AISecurityIntelligence = require('./ai/AISecurityIntelligence');
 const BlockchainIntegrity = require('./blockchain/BlockchainIntegrity');
 const ZeroKnowledgeAuth = require('./auth/ZeroKnowledgeAuth');
+const SecureDatabaseLayer = require('./database/SecureDatabaseLayer');
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
@@ -51,6 +52,10 @@ class CosmicProto extends EventEmitter {
     this.aiSecurity = new AISecurityIntelligence();
     this.blockchain = new BlockchainIntegrity();
     this.zkAuth = new ZeroKnowledgeAuth();
+    this.secureDB = new SecureDatabaseLayer({
+      encryptionLevel: 'maximum',
+      quantumEncryption: true
+    });
     
     // Protocol state
     this.sessions = new Map();
@@ -667,6 +672,25 @@ class CosmicProto extends EventEmitter {
 
   handleAuthChallenge(challenge) {
     console.log('🔐 Auth challenge issued:', challenge.id);
+  }
+
+  /**
+   * Connect cloud database through quantum encryption
+   */
+  connectCloudDatabase(databaseConnection) {
+    console.log('🔗 Connecting cloud database through CosmicProto quantum encryption...');
+    
+    // Pass connection to SecureDatabaseLayer through quantum encryption layer
+    this.secureDB.setCloudDatabaseConnection(databaseConnection);
+    
+    console.log('✅ Cloud database connected through CosmicProto security');
+  }
+
+  /**
+   * Get SecureDatabaseLayer instance
+   */
+  getSecureDatabaseLayer() {
+    return this.secureDB;
   }
 }
 

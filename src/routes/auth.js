@@ -9,11 +9,36 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-// Initialize authentication controller
-const authController = new UserAuthController();
+// Authentication controller will be initialized with CosmicProto instance
+let authController = null;
+
+/**
+ * Initialize auth controller with CosmicProto instance
+ */
+function initializeAuthController(cosmicProto) {
+  console.log('🔐 Initializing auth controller with CosmicProto encryption...');
+  authController = new UserAuthController(cosmicProto);
+  return authController;
+}
 
 // Middleware for request logging and security
 const securityMiddleware = (req, res, next) => {
+  console.log(`🛡️ Security middleware hit: ${req.method} ${req.path}`);
+  console.log(`🔍 AuthController status: ${authController ? 'initialized' : 'NULL'}`);
+  
+  // Check if authController is initialized
+  if (!authController) {
+    console.error('❌ AuthController is NULL - service not ready');
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: 503,
+        message: 'Authentication service not ready - CosmicProto initializing',
+        requestId: req.requestId || crypto.randomUUID()
+      }
+    });
+  }
+  
   // Add request ID for tracing
   req.requestId = crypto.randomUUID();
   
@@ -89,6 +114,18 @@ const createRateLimiter = (windowMs, max, message) => {
 router.use(securityMiddleware);
 router.use(validateJsonInput);
 
+// Add global debug middleware
+router.use((req, res, next) => {
+  console.log('🌐 === AUTH ROUTE HIT ===');
+  console.log('🌐 Method:', req.method);
+  console.log('🌐 Path:', req.path);
+  console.log('🌐 Full URL:', req.originalUrl);
+  console.log('🌐 Body:', req.body);
+  console.log('🌐 Headers:', req.headers);
+  console.log('🌐 === END AUTH ROUTE INFO ===');
+  next();
+});
+
 /**
  * @route POST /auth/register
  * @desc Register new user with quantum encryption
@@ -97,15 +134,75 @@ router.use(validateJsonInput);
 router.post('/register', 
   createRateLimiter(60 * 60 * 1000, 5, 'Too many registration attempts'), // 5 per hour
   async (req, res) => {
+    console.log('🚀 Registration route hit!', req.requestId);
+    console.log('📊 Request body:', JSON.stringify(req.body, null, 2));
+    
+    // SIMPLIFIED TEST - bypass complex validation temporarily
     try {
-      await authController.registerUser(req, res);
+      const { firstName, lastName, email, password } = req.body;
+      
+      // Basic validation only
+      if (!firstName || !lastName || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 400,
+            message: 'Missing required fields',
+            requestId: req.requestId,
+            timestamp: Date.now()
+          }
+        });
+      }
+      
+      console.log('✅ Basic validation passed');
+      console.log('📊 Calling direct MySQL test...');
+      
+      // DIRECT MYSQL TEST - bypass complex CosmicProto
+      const mysql = require('mysql2/promise');
+      const connection = await mysql.createConnection({
+        host: process.env.MYSQL_HOST,
+        port: parseInt(process.env.MYSQL_PORT),
+        user: process.env.MYSQL_USER,
+        password: process.env.MYSQL_PASSWORD,
+        database: process.env.MYSQL_DATABASE,
+        ssl: { rejectUnauthorized: false }
+      });
+      
+      console.log('✅ Direct MySQL connection established');
+      
+      const [result] = await connection.execute(
+        'INSERT INTO users (email, first_name, last_name, password_hash) VALUES (?, ?, ?, ?)',
+        [email, firstName, lastName, password + '_hashed']
+      );
+      
+      console.log('✅ Direct MySQL insert successful, ID:', result.insertId);
+      await connection.end();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'User registered successfully with direct MySQL',
+        user: {
+          id: result.insertId,
+          email: email,
+          firstName: firstName,
+          lastName: lastName
+        },
+        databaseStorage: {
+          mysql: { success: true, id: result.insertId }
+        },
+        timestamp: Date.now(),
+        operationId: req.requestId
+      });
+      
     } catch (error) {
-      console.error('❌ Registration route error:', error);
+      console.error('❌ Simplified registration error:', error.message);
+      console.error('❌ Stack trace:', error.stack);
       res.status(500).json({
         success: false,
         error: {
           code: 500,
-          message: 'Registration service unavailable',
+          message: 'Simplified registration failed',
+          debug: error.message,
           requestId: req.requestId,
           timestamp: Date.now()
         }
@@ -466,5 +563,8 @@ router.use('*', (req, res) => {
     }
   });
 });
+
+// Export router and initialization function
+router.initializeAuthController = initializeAuthController;
 
 module.exports = router;

@@ -192,10 +192,107 @@ const CustomSelect = ({ options, placeholder, value, onChange }) => {
 
 // Main App Component
 const App = () => {
-    const [formData, setFormData] = React.useState({ day: '', month: '', year: '', gender: '' });
+    const [formData, setFormData] = React.useState({ 
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        day: '', 
+        month: '', 
+        year: '', 
+        gender: '' 
+    });
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [error, setError] = React.useState('');
+    
+    const handleInputChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        if (error) setError(''); // Clear error when user types
+    };
     
     const handleSelectChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+
+        // Validate form
+        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
+            setError('Vui lòng điền đầy đủ thông tin');
+            setIsLoading(false);
+            return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+            setError('Mật khẩu xác nhận không khớp');
+            setIsLoading(false);
+            return;
+        }
+
+        if (!formData.day || !formData.month || !formData.year || !formData.gender) {
+            setError('Vui lòng điền đầy đủ ngày sinh và giới tính');
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: formData.email,
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    password: formData.password,
+                    confirmPassword: formData.confirmPassword,
+                    dateOfBirth: `${formData.year}-${formData.month.toString().padStart(2, '0')}-${formData.day.toString().padStart(2, '0')}`,
+                    gender: formData.gender,
+                    autoLogin: true // Enable auto-login after registration
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Check if auto-login was successful
+                if (data.autoLoginSuccess && data.session) {
+                    // Store session data for auto-login
+                    localStorage.setItem('cosmic_session', JSON.stringify({
+                        sessionId: data.session.sessionId,
+                        userId: data.userId,
+                        tokens: data.session.tokens,
+                        expiresAt: data.session.expiresAt
+                    }));
+                    
+                    // Set session cookie if available
+                    document.cookie = `cosmic_session=${JSON.stringify({
+                        sessionId: data.session.sessionId,
+                        userId: data.userId,
+                        tokens: data.session.tokens,
+                        expiresAt: data.session.expiresAt
+                    })}; path=/; max-age=86400`; // 24 hours
+                    
+                    alert('🎉 Đăng ký thành công! Đang chuyển đến trang chủ...');
+                    window.location.href = '/home';
+                } else {
+                    alert('✅ Đăng ký thành công! Vui lòng đăng nhập.');
+                    window.location.href = '/login';
+                }
+            } else {
+                setError(data.error?.message || 'Đăng ký thất bại');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            setError('Có lỗi xảy ra. Vui lòng thử lại.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Date and gender options for dropdowns
@@ -214,10 +311,31 @@ const App = () => {
                     <h1 className="text-3xl font-bold text-white">Khởi Tạo Hành Trình</h1>
                     <p className="text-gray-300">Gia nhập vào vũ trụ của chúng tôi</p>
                 </div>
-                <div className="w-full space-y-4">
+                
+                {error && (
+                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm">
+                        {error}
+                    </div>
+                )}
+                
+                <form onSubmit={handleRegister} className="w-full space-y-4">
                     <div className="flex flex-col sm:flex-row gap-4">
-                        <input type="text" placeholder="Họ" className="w-full p-3 rounded-lg form-input" />
-                        <input type="text" placeholder="Tên" className="w-full p-3 rounded-lg form-input" />
+                        <input 
+                            type="text" 
+                            placeholder="Họ" 
+                            value={formData.firstName}
+                            onChange={(e) => handleInputChange('firstName', e.target.value)}
+                            disabled={isLoading}
+                            className="w-full p-3 rounded-lg form-input" 
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="Tên" 
+                            value={formData.lastName}
+                            onChange={(e) => handleInputChange('lastName', e.target.value)}
+                            disabled={isLoading}
+                            className="w-full p-3 rounded-lg form-input" 
+                        />
                     </div>
                     <div>
                         <label className="text-sm text-gray-400 mb-1 block">Ngày sinh</label>
@@ -229,18 +347,58 @@ const App = () => {
                     </div>
                     <div>
                         <label className="text-sm text-gray-400 mb-1 block">Giới tính</label>
-                            <CustomSelect options={genderOptions} placeholder="Chọn giới tính" value={formData.gender} onChange={(val) => handleSelectChange('gender', val)} />
+                        <CustomSelect options={genderOptions} placeholder="Chọn giới tính" value={formData.gender} onChange={(val) => handleSelectChange('gender', val)} />
                     </div>
-                    <input type="email" placeholder="Nhập email của bạn" className="w-full p-3 rounded-lg form-input" />
-                    <input type="password" placeholder="Tạo mật khẩu mới" className="w-full p-3 rounded-lg form-input" />
-                    <input type="password" placeholder="Nhập lại mật khẩu" className="w-full p-3 rounded-lg form-input" />
-                    <button className="w-full p-3 rounded-lg font-bold form-button !mt-6">Tạo Tài Khoản</button>
-                    <p className="text-center text-gray-300 text-sm !mt-4">Đã có tài khoản? <a href="./login.html" className="font-semibold form-link transition">Đăng nhập ngay</a></p>
-                </div>
+                    <input 
+                        type="email" 
+                        placeholder="Nhập email của bạn" 
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        disabled={isLoading}
+                        className="w-full p-3 rounded-lg form-input" 
+                    />
+                    <input 
+                        type="password" 
+                        placeholder="Tạo mật khẩu mới (tối thiểu 8 ký tự)" 
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        disabled={isLoading}
+                        className="w-full p-3 rounded-lg form-input" 
+                    />
+                    <input 
+                        type="password" 
+                        placeholder="Nhập lại mật khẩu" 
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        disabled={isLoading}
+                        className="w-full p-3 rounded-lg form-input" 
+                    />
+                    <button 
+                        type="submit" 
+                        disabled={isLoading}
+                        className="w-full p-3 rounded-lg font-bold form-button !mt-6 disabled:opacity-50"
+                    >
+                        {isLoading ? 'Đang tạo tài khoản...' : 'Tạo Tài Khoản'}
+                    </button>
+                    <p className="text-center text-gray-300 text-sm !mt-4">
+                        Đã có tài khoản? 
+                        <a href="/login" className="font-semibold form-link transition ml-1">Đăng nhập ngay</a>
+                    </p>
+                </form>
             </div>
         </>
     );
 };
 
 // Render the React app to the DOM
-ReactDOM.render(<App />, document.getElementById('root'));
+// Render the React app to the DOM
+const container = document.getElementById('root');
+
+if (ReactDOM.createRoot) {
+    // React 18
+    const root = ReactDOM.createRoot(container);
+    root.render(React.createElement(App));
+} else {
+    // React 17 and below fallback
+    ReactDOM.render(React.createElement(App), container);
+}

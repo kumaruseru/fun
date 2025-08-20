@@ -11,28 +11,38 @@ const crypto = require('crypto');
  * User Authentication Controller with Quantum Security
  */
 class UserAuthController {
-  constructor() {
-    // Initialize security systems
-    this.cosmicProto = new CosmicProto({
-      securityLevel: 'maximum',
-      encryptionLayers: ['quantum', 'symmetric', 'steganography'],
-      realTimeAnalysis: true,
-      adaptiveSecurity: true
-    });
+  constructor(cosmicProto = null) {
+    console.log('🚀 Initializing User Authentication Controller...');
     
-    this.secureDB = new SecureDatabaseLayer({
-      encryptionLevel: 'maximum',
-      encryption: {
-        fieldLevelEncryption: true,
-        queryEncryption: true,
-        keyRotationInterval: 24 * 60 * 60 * 1000
-      },
-      accessControl: {
-        requireZKAuth: true,
-        sessionValidation: true,
-        operationLogging: true
-      }
-    });
+    // Get SecureDatabaseLayer from CosmicProto (encrypted connection)
+    if (cosmicProto) {
+      this.cosmicProto = cosmicProto;
+      this.secureDB = cosmicProto.getSecureDatabaseLayer();
+      console.log('🔐 Using CosmicProto encrypted database layer');
+    } else {
+      // Fallback: create new CosmicProto and SecureDatabaseLayer
+      this.cosmicProto = new CosmicProto({
+        securityLevel: 'maximum',
+        encryptionLayers: ['quantum', 'symmetric', 'steganography'],
+        realTimeAnalysis: true,
+        adaptiveSecurity: true
+      });
+      
+      this.secureDB = new SecureDatabaseLayer({
+        encryptionLevel: 'maximum',
+        encryption: {
+          fieldLevelEncryption: true,
+          queryEncryption: true,
+          keyRotationInterval: 24 * 60 * 60 * 1000
+        },
+        accessControl: {
+          requireZKAuth: true,
+          sessionValidation: true,
+          operationLogging: true
+        }
+      });
+      console.log('⚠️ Using fallback CosmicProto and SecureDatabaseLayer');
+    }
     
     // Controller configuration
     this.config = {
@@ -50,7 +60,7 @@ class UserAuthController {
       validation: {
         emailRegex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
         usernameRegex: /^[a-zA-Z0-9_]{3,30}$/,
-        passwordMinLength: 12,
+        passwordMinLength: 8, // Reduced from 12 to 8 for better UX
         requireMFA: true
       },
       
@@ -71,6 +81,14 @@ class UserAuthController {
     
     // Initialize controller
     this.initialize();
+  }
+
+  /**
+   * Set cloud database connection
+   */
+  setCloudDatabaseConnection(connection) {
+    console.log('🔗 Setting cloud database connection in UserAuthController...');
+    this.secureDB.setCloudDatabaseConnection(connection);
   }
 
   /**
@@ -100,14 +118,25 @@ class UserAuthController {
     const startTime = Date.now();
     const operationId = crypto.randomUUID();
     
+    console.log('🚀 === UserAuthController.registerUser START ===');
     console.log(`📝 User registration request - Operation: ${operationId}`);
+    console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
     
     try {
+      console.log('📋 Step 1: Extract and validate request data...');
       // Step 1: Extract and validate request data
-      const { email, username, password, confirmPassword, biometricData } = req.body;
+      const { email, firstName, lastName, password, confirmPassword, biometricData } = req.body;
       const clientIP = req.ip || req.connection.remoteAddress;
       const userAgent = req.get('User-Agent');
       const deviceInfo = this.extractDeviceInfo(req);
+      
+      console.log('🔍 Registration data extracted:', {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        hasPassword: !!password,
+        clientIP: clientIP
+      });
       
       // Step 2: Rate limiting check
       const rateLimitCheck = this.checkRateLimit('registration', clientIP);
@@ -120,20 +149,26 @@ class UserAuthController {
       
       // Step 3: Input validation
       const validation = this.validateRegistrationInput({
-        email, username, password, confirmPassword
+        email, firstName, lastName, password, confirmPassword
       });
       
+      console.log('🔍 Validation result:', validation);
+      
       if (!validation.valid) {
+        console.log('❌ Validation failed:', validation.errors);
         return this.sendErrorResponse(res, 400, validation.message, {
           operationId,
           validationErrors: validation.errors
         });
       }
       
-      // Step 4: Check if user already exists
-      const existingUser = await this.checkUserExists(email, username);
-      if (existingUser.exists) {
-        return this.sendErrorResponse(res, 409, existingUser.message, {
+      // Step 4: Check if email already exists (username is generated uniquely)
+      console.log('🔍 Checking email existence for:', email);
+      const existingEmail = await this.secureDB.secureRetrieveUserRecord(email);
+      console.log('🔍 Email check result:', existingEmail ? 'EXISTS' : 'NOT_FOUND');
+      
+      if (existingEmail) {
+        return this.sendErrorResponse(res, 409, 'Email already registered', {
           operationId
         });
       }
@@ -141,7 +176,8 @@ class UserAuthController {
       // Step 5: Prepare user data for quantum registration
       const userData = {
         email: email.toLowerCase().trim(),
-        username: username.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         password,
         biometricData: biometricData || null,
         registrationIP: clientIP,
@@ -170,16 +206,35 @@ class UserAuthController {
       
       // Step 8: Secure registration with quantum encryption
       console.log('🔐 Processing with CosmicProto quantum security...');
-      const registrationResult = await this.secureDB.secureUserRegistration(
-        userData,
-        enhancedDeviceInfo,
-        securityContext
-      );
       
-      if (!registrationResult.success) {
-        return this.sendErrorResponse(res, 500, registrationResult.reason, {
+      try {
+        const registrationResult = await this.secureDB.secureUserRegistration(
+          userData,
+          enhancedDeviceInfo,
+          securityContext
+        );
+        
+        console.log('🔍 Registration result:', {
+          success: registrationResult?.success,
+          reason: registrationResult?.reason,
+          hasError: !!registrationResult?.error
+        });
+        
+        if (!registrationResult || !registrationResult.success) {
+          const errorMessage = registrationResult?.reason || 'Registration failed - unknown error';
+          console.log('❌ Registration failed:', errorMessage);
+          return this.sendErrorResponse(res, 500, errorMessage, {
+            operationId,
+            error: this.sanitizeError(registrationResult?.error)
+          });
+        }
+        
+      } catch (registrationError) {
+        console.error('❌ Registration error caught:', registrationError.message);
+        console.error('❌ Full registration error:', registrationError);
+        return this.sendErrorResponse(res, 500, 'Registration system error', {
           operationId,
-          error: this.sanitizeError(registrationResult.error)
+          error: this.sanitizeError(registrationError)
         });
       }
       
@@ -458,22 +513,27 @@ class UserAuthController {
 
   // ===================== Helper Methods =====================
 
-  validateRegistrationInput({ email, username, password, confirmPassword }) {
+  validateRegistrationInput({ email, firstName, lastName, password, confirmPassword }) {
     const errors = [];
     
     if (!email || !this.config.validation.emailRegex.test(email)) {
       errors.push('Invalid email format');
     }
     
-    if (!username || !this.config.validation.usernameRegex.test(username)) {
-      errors.push('Username must be 3-30 characters, alphanumeric and underscore only');
+    if (!firstName || firstName.trim().length < 1) {
+      errors.push('First name is required');
+    }
+    
+    if (!lastName || lastName.trim().length < 1) {
+      errors.push('Last name is required');
     }
     
     if (!password || password.length < this.config.validation.passwordMinLength) {
       errors.push(`Password must be at least ${this.config.validation.passwordMinLength} characters`);
     }
     
-    if (password !== confirmPassword) {
+    // Only check password match if confirmPassword is provided (for frontend forms)
+    if (confirmPassword !== undefined && password !== confirmPassword) {
       errors.push('Passwords do not match');
     }
     
@@ -547,20 +607,25 @@ class UserAuthController {
   async checkUserExists(email, username) {
     // Check in database if user already exists
     try {
+      console.log('🔍 Checking user existence for:', { email, username });
+      
       const existingEmail = await this.secureDB.secureRetrieveUserRecord(email);
+      console.log('🔍 Email check result:', existingEmail ? 'EXISTS' : 'NOT_FOUND');
       if (existingEmail) {
         return { exists: true, message: 'Email already registered' };
       }
       
-      const existingUsername = await this.secureDB.secureRetrieveUserRecord(username);
-      if (existingUsername) {
-        return { exists: true, message: 'Username already taken' };
-      }
+      // For now, skip username check as we use email as primary key
+      // const existingUsername = await this.secureDB.secureRetrieveUserRecord(username);
+      // if (existingUsername) {
+      //   return { exists: true, message: 'Username already taken' };
+      // }
       
       return { exists: false };
     } catch (error) {
-      console.error('❌ User existence check error:', error);
-      return { exists: false };
+      console.error('❌ User existence check error:', error.message);
+      console.error('❌ Full error:', error);
+      throw error; // Re-throw to see the actual error
     }
   }
 
@@ -639,6 +704,11 @@ class UserAuthController {
   }
 
   sanitizeErrorMessage(message) {
+    // Check if message is null or undefined
+    if (!message || typeof message !== 'string') {
+      return 'An internal error occurred';
+    }
+    
     // Remove sensitive patterns from error messages
     const sensitivePatterns = ['password', 'key', 'secret', 'token', 'hash'];
     let sanitized = message;

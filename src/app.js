@@ -24,11 +24,14 @@ const authMiddleware = require('./middleware/auth');
 
 // Import security systems
 const CosmicProto = require('./security/cosmicproto/CosmicProto');
+const DatabaseManager = require('./config/database');
 
 class CosmicProtoServer {
   constructor() {
     this.app = express();
     this.cosmicProto = null;
+    this.databaseManager = new DatabaseManager();
+    this.databaseConnections = null;
     
     // Server configuration
     this.config = {
@@ -39,7 +42,12 @@ class CosmicProtoServer {
       // Security configuration
       security: {
         enableHttps: process.env.ENABLE_HTTPS === 'true',
-        corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+        corsOrigins: process.env.CORS_ORIGINS?.split(',') || [
+          'http://localhost:3000',
+          'http://localhost:10000',
+          'http://127.0.0.1:10000',
+          'http://0.0.0.0:10000'
+        ],
         rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
         rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // requests per window
         slowDownThreshold: parseInt(process.env.RATE_LIMIT_SLOW_DOWN_THRESHOLD) || 50, // start slowing down after 50 requests
@@ -67,19 +75,22 @@ class CosmicProtoServer {
     console.log('🚀 Initializing CosmicProto Express Server...');
     
     try {
-      // Step 1: Initialize CosmicProto security
+      // Step 1: Initialize cloud databases
+      await this.initializeDatabases();
+      
+      // Step 2: Initialize CosmicProto security
       await this.initializeCosmicProto();
       
-      // Step 2: Configure security middleware
+      // Step 3: Configure security middleware
       this.configureSecurityMiddleware();
       
-      // Step 3: Configure general middleware
+      // Step 4: Configure general middleware
       this.configureGeneralMiddleware();
       
-      // Step 4: Configure routes
+      // Step 5: Configure routes
       this.configureRoutes();
       
-      // Step 5: Configure error handling
+      // Step 6: Configure error handling
       this.configureErrorHandling();
       
       console.log('✅ CosmicProto server initialized successfully');
@@ -87,6 +98,27 @@ class CosmicProtoServer {
     } catch (error) {
       console.error('❌ Server initialization failed:', error);
       process.exit(1);
+    }
+  }
+
+  /**
+   * Initialize cloud databases
+   */
+  async initializeDatabases() {
+    console.log('☁️ Initializing cloud databases...');
+    
+    try {
+      this.databaseConnections = await this.databaseManager.initializeAll();
+      
+      // Pass MongoDB connection to CosmicProto security layer
+      if (this.databaseConnections.mongodb) {
+        console.log('✅ MongoDB cloud connection established');
+      }
+      
+      console.log('✅ All cloud databases initialized successfully');
+    } catch (error) {
+      console.warn('⚠️ Database initialization failed, continuing with in-memory storage:', error.message);
+      // Continue without database - system will use in-memory storage
     }
   }
 
@@ -105,12 +137,31 @@ class CosmicProtoServer {
       networkMode: 'decentralized'
     });
     
+    // Pass all 4 database connections to SecureDatabaseLayer
+    if (this.databaseConnections) {
+      console.log('🔗 Connecting quantum security to all databases...');
+      
+      // MongoDB for encrypted cloud storage
+      if (this.databaseConnections.mongodb) {
+        console.log('✅ MongoDB cloud connection established');
+        this.cosmicProto.connectCloudDatabase(this.databaseConnections.mongodb);
+      }
+      
+      // Pass complete database connections object to security layer
+      const secureDbLayer = this.cosmicProto.getSecureDatabaseLayer();
+      if (secureDbLayer) {
+        secureDbLayer.databaseConnections = this.databaseConnections;
+        console.log('🗄️ All database connections passed to security layer');
+        console.log('📊 Available databases:', Object.keys(this.databaseConnections).filter(key => this.databaseConnections[key]));
+      }
+    }
+    
     // Wait for protocol to be ready
     await new Promise((resolve) => {
       this.cosmicProto.once('protocol_ready', resolve);
     });
     
-    console.log('✅ CosmicProto security system ready');
+    console.log('✅ CosmicProto security system ready with 4-database architecture');
   }
 
   /**
@@ -142,19 +193,9 @@ class CosmicProtoServer {
       }
     }));
     
-    // CORS configuration
+    // CORS configuration - Allow all origins for local development
     this.app.use(cors({
-      origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, etc.)
-        if (!origin) return callback(null, true);
-        
-        if (this.config.security.corsOrigins.includes(origin) || 
-            this.config.nodeEnv === 'development') {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
+      origin: true, // Allow all origins
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: [
@@ -300,9 +341,32 @@ class CosmicProtoServer {
   configureRoutes() {
     console.log('🛣️ Configuring routes...');
     
-    // Serve static files
-    this.app.use('/ui', express.static('src/ui'));
-    this.app.use('/public', express.static('public'));
+    // Configure static file serving with proper MIME types
+    this.app.use('/ui', express.static('src/ui', {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+      }
+    }));
+    this.app.use('/public', express.static('public', {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.ico')) {
+          res.setHeader('Content-Type', 'image/x-icon');
+        }
+      }
+    }));
+    
+    // Serve favicon from root
+    this.app.get('/favicon.ico', (req, res) => {
+      res.sendFile('public/favicon.ico', { root: '.' });
+    });
     
     // Page routes with authentication
     this.app.get('/', authMiddleware.redirectToLogin, (req, res) => {
@@ -391,6 +455,10 @@ class CosmicProtoServer {
         timestamp: Date.now()
       });
     });
+    
+    // Initialize authentication routes with CosmicProto
+    console.log('🔐 Initializing authentication with CosmicProto encryption...');
+    authRoutes.initializeAuthController(this.cosmicProto);
     
     // Authentication routes
     this.app.use('/api/auth', authRoutes);

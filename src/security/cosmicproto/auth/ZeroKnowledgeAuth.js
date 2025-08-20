@@ -158,7 +158,8 @@ class ZeroKnowledgeAuth extends EventEmitter {
       const encryptedProfile = await this.createEncryptedUserProfile({
         userId,
         email: userData.email,
-        username: userData.username,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         quantumCredentials,
         zkPasswordProof,
         biometricTemplate,
@@ -496,7 +497,8 @@ class ZeroKnowledgeAuth extends EventEmitter {
     return {
       userId: profileData.userId,
       email: profileData.email,
-      username: profileData.username,
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
       encryptedFields,
       profileHash,
       encryptedKey: {
@@ -547,7 +549,8 @@ class ZeroKnowledgeAuth extends EventEmitter {
       return {
         userId: encryptedProfile.userId,
         email: encryptedProfile.email,
-        username: encryptedProfile.username,
+        firstName: encryptedProfile.firstName,
+        lastName: encryptedProfile.lastName,
         ...decryptedFields,
         deviceId: encryptedProfile.deviceId,
         securityLevel: encryptedProfile.securityLevel,
@@ -584,8 +587,8 @@ class ZeroKnowledgeAuth extends EventEmitter {
   // ===================== Helper Methods =====================
 
   validateRegistrationData(userData) {
-    if (!userData.email || !userData.password || !userData.username) {
-      return { valid: false, reason: 'Missing required fields' };
+    if (!userData.email || !userData.password) {
+      return { valid: false, reason: 'Missing required fields (email, password)' };
     }
     
     if (!this.validatePasswordComplexity(userData.password)) {

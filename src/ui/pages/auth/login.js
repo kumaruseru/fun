@@ -291,4 +291,13 @@ const App = () => {
 };
 
 // Render the React app to the DOM
-ReactDOM.render(<App />, document.getElementById('root'));
+const container = document.getElementById('root');
+
+if (ReactDOM.createRoot) {
+    // React 18
+    const root = ReactDOM.createRoot(container);
+    root.render(React.createElement(App));
+} else {
+    // React 17 and below fallback
+    ReactDOM.render(React.createElement(App), container);
+}

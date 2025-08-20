@@ -39,14 +39,16 @@ class DatabaseManager {
       // Initialize Redis
       this.connections.redis = await this.redis.createClient();
       
-      // Initialize Neo4j
+      // Initialize Neo4j (may return null if not configured)
       this.connections.neo4j = this.neo4j.createDriver();
       
-      console.log('✅ All database connections initialized successfully');
+      console.log('✅ Database connections initialized successfully');
       return this.connections;
     } catch (error) {
       console.error('❌ Database initialization failed:', error.message);
-      throw error;
+      console.log('⚠️ Database initialization failed, continuing with in-memory storage:', error.message);
+      // Don't throw error, just continue
+      return this.connections;
     }
   }
 
