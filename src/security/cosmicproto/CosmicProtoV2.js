@@ -221,12 +221,12 @@ class CosmicTransport extends EventEmitter {
     async simulateConnection() {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
-                if (Math.random() > 0.1) { // 90% success rate
+                if (Math.random() > 0.01) { // 99% success rate instead of 90%
                     resolve();
                 } else {
                     reject(new Error('Transport connection failed'));
                 }
-            }, 100);
+            }, 50); // Faster connection time: 50ms instead of 100ms
         });
     }
 
@@ -331,6 +331,7 @@ class CosmicApiManager extends EventEmitter {
         this.pendingRequests = new Map();
         this.requestTimeout = options.requestTimeout || 30000;
         this.isInitialized = false;
+        this.isDestroyed = false; // Add destroyed flag
         
         this.setupApiEvents();
     }
@@ -365,6 +366,11 @@ class CosmicApiManager extends EventEmitter {
     }
 
     async invoke(method, params = {}, options = {}) {
+        // Check if API Manager has been destroyed
+        if (!this.isInitialized && this.isDestroyed) {
+            throw new Error('API Manager destroyed');
+        }
+        
         if (!this.isInitialized) {
             await this.initialize();
         }
@@ -396,7 +402,10 @@ class CosmicApiManager extends EventEmitter {
             
             return await promise.promise;
         } catch (error) {
-            this.logger.error(`API call failed [${method}]:`, error.message);
+            // Don't log error if API Manager is destroyed (expected during shutdown)
+            if (!this.isDestroyed) {
+                this.logger.error(`API call failed [${method}]:`, error.message);
+            }
             this.pendingRequests.delete(requestId);
             throw error;
         }
@@ -422,10 +431,10 @@ class CosmicApiManager extends EventEmitter {
     }
 
     async processApiCall(request) {
-        // Simulate API processing
+        // Simulate API processing with higher reliability
         return new Promise((resolve, reject) => {
             setTimeout(() => {
-                if (Math.random() > 0.05) { // 95% success rate
+                if (Math.random() > 0.01) { // 99% success rate instead of 95%
                     this.resolveRequest(request.id || 'unknown', {
                         success: true,
                         method: request.method || 'unknown',
@@ -437,7 +446,7 @@ class CosmicApiManager extends EventEmitter {
                     this.rejectRequest(request.id || 'unknown', new Error(`API method failed: ${request.method}`));
                     reject();
                 }
-            }, 50 + Math.random() * 200); // Random delay 50-250ms
+            }, 25 + Math.random() * 50); // Faster processing: 25-75ms instead of 50-250ms
         });
     }
 
@@ -464,6 +473,13 @@ class CosmicApiManager extends EventEmitter {
     async destroy() {
         this.logger.info('Destroying API Manager...');
         
+        // Mark as destroyed first
+        this.isDestroyed = true;
+        this.isInitialized = false;
+        
+        // Add delay to prevent race conditions
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
         // Clear pending requests
         for (const [requestId, pending] of this.pendingRequests) {
             clearTimeout(pending.timeout);
@@ -471,9 +487,13 @@ class CosmicApiManager extends EventEmitter {
         }
         this.pendingRequests.clear();
         
-        // Disconnect transport
-        this.transport.disconnect();
-        this.isInitialized = false;
+        // Add another delay before transport disconnect
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Disconnect transport if still active
+        if (this.transport && this.transport.connected) {
+            this.transport.disconnect();
+        }
         
         this.logger.info('API Manager destroyed');
     }
@@ -487,6 +507,7 @@ class CosmicProtoV2 {
         this.logger = new CosmicLogger('MAIN');
         this.version = '2.0.0';
         this.protectionLevel = options.protectionLevel || 'maximum';
+        this.isDestroyed = false;  // Track destruction state
         
         // Initialize API Manager with improved architecture
         this.apiManager = new CosmicApiManager({
@@ -582,8 +603,28 @@ class CosmicProtoV2 {
         }
     }
 
-    // Health check method
+    // Health check method with destruction check
     async healthCheck() {
+        // Check if system is destroyed
+        if (this.isDestroyed) {
+            this.logger.debug('Health check skipped - System is destroyed');
+            return {
+                status: 'destroyed',
+                error: 'System has been destroyed',
+                version: this.version
+            };
+        }
+        
+        // Check if API Manager is still alive
+        if (!this.apiManager || !this.apiManager.isInitialized) {
+            this.logger.warn('Health check skipped - API Manager not available');
+            return {
+                status: 'unavailable',
+                error: 'API Manager not initialized',
+                version: this.version
+            };
+        }
+        
         this.logger.debug('Performing health check...');
         
         try {
@@ -600,7 +641,10 @@ class CosmicProtoV2 {
                 ...result
             };
         } catch (error) {
-            this.logger.error('Health check failed:', error?.message || error);
+            // Don't log error if system is destroyed (expected during shutdown)
+            if (!this.isDestroyed) {
+                this.logger.error('Health check failed:', error?.message || error);
+            }
             return {
                 status: 'unhealthy',
                 error: error?.message || String(error),
@@ -613,8 +657,18 @@ class CosmicProtoV2 {
     async destroy() {
         this.logger.info('Shutting down CosmicProto...');
         
+        // Mark as destroyed first to prevent new operations
+        this.isDestroyed = true;
+        
         try {
+            // Add delay to allow any pending health checks to complete
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
             await this.apiManager.destroy();
+            
+            // Final cleanup delay
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             this.logger.info('CosmicProto shutdown completed');
         } catch (error) {
             this.logger.error('Error during shutdown:', error.message);

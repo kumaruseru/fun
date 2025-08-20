@@ -53,7 +53,7 @@ class DatabaseConnectionManager extends EventEmitter {
         this.circuitBreakers.set(dbName, {
             failures: 0,
             maxFailures: 5,
-            timeout: 60000,
+            cooldownTimeout: 60000,  // Renamed from 'timeout' to avoid conflict
             state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
             nextAttempt: 0
         });
@@ -68,9 +68,7 @@ class DatabaseConnectionManager extends EventEmitter {
             connectionLimit: config.connectionLimit || 10,
             queueLimit: config.queueLimit || 0,
             waitForConnections: true,
-            acquireTimeout: 60000,
-            timeout: 60000,
-            reconnect: true,
+            // acquireTimeout: 60000,  // REMOVED: Not valid for MySQL2 pool
             multipleStatements: false
         };
 
@@ -156,7 +154,7 @@ class DatabaseConnectionManager extends EventEmitter {
 
         if (breaker.failures >= breaker.maxFailures) {
             breaker.state = 'OPEN';
-            breaker.nextAttempt = Date.now() + breaker.timeout;
+            breaker.nextAttempt = Date.now() + breaker.cooldownTimeout;
             this.logger.warn(`Circuit breaker OPEN for ${dbName} until ${new Date(breaker.nextAttempt)}`);
             this.emit('circuitBreakerOpen', { dbName, error });
         }
@@ -184,6 +182,11 @@ class DatabaseConnectionManager extends EventEmitter {
     }
 
     async performHealthCheck() {
+        // Skip health check if system is being destroyed
+        if (this.isDestroying) {
+            return;
+        }
+        
         for (const [dbName] of this.pools) {
             try {
                 await this.testConnection(dbName);
@@ -251,6 +254,7 @@ class SecureDatabaseLayerV2 extends EventEmitter {
         this.connectionManager = new DatabaseConnectionManager(this.config);
         this.queryCache = new Map();
         this.isInitialized = false;
+        this.isDestroying = false;  // Track destruction state
 
         this.setupEventHandlers();
     }
@@ -590,14 +594,32 @@ class SecureDatabaseLayerV2 extends EventEmitter {
         this.logger.debug('Performing database layer health check...');
         
         try {
-            // Check CosmicProto health with timeout protection
+            // Check if system is being destroyed
+            if (this.isDestroying) {
+                return {
+                    status: 'shutting_down',
+                    error: 'System is being destroyed',
+                    timestamp: new Date()
+                };
+            }
+            
+            // Check CosmicProto health with timeout and destruction protection
             let cosmicProtoHealth;
             try {
-                const healthPromise = this.cosmicProto.healthCheck();
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Health check timeout')), 5000)
-                );
-                cosmicProtoHealth = await Promise.race([healthPromise, timeoutPromise]);
+                // Quick check if cosmicProto is destroyed before calling
+                if (this.cosmicProto && this.cosmicProto.isDestroyed) {
+                    cosmicProtoHealth = {
+                        status: 'destroyed',
+                        error: 'CosmicProto is destroyed',
+                        version: '2.0.0'
+                    };
+                } else {
+                    const healthPromise = this.cosmicProto.healthCheck();
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Health check timeout')), 2000) // Reduced timeout
+                    );
+                    cosmicProtoHealth = await Promise.race([healthPromise, timeoutPromise]);
+                }
             } catch (error) {
                 this.logger.warn('CosmicProto health check failed:', error.message);
                 cosmicProtoHealth = {
@@ -651,6 +673,21 @@ class SecureDatabaseLayerV2 extends EventEmitter {
         this.logger.info('Destroying Secure Database Layer v2.0...');
         
         try {
+            // Set destruction flag immediately to prevent new operations
+            this.isDestroying = true;
+            
+            // Stop any pending health check interval first and wait
+            if (this.healthCheckInterval) {
+                clearInterval(this.healthCheckInterval);
+                this.healthCheckInterval = null;
+                // Give time for any running health checks to complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // Add delay before destroying CosmicProto to let pending calls finish
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // Destroy components in proper order
             await this.connectionManager.destroy();
             await this.cosmicProto.destroy();
             
