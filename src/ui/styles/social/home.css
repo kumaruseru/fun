@@ -1,0 +1,236 @@
+/* General body styling */
+body {
+    font-family: 'Inter', sans-serif;
+    background: #090a0f;
+    color: #E5E7EB; /* gray-200 */
+}
+
+/* Fixed canvas for the cosmic background */
+#cosmic-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -10;
+}
+
+/* Glassmorphism effect for panes */
+.glass-pane {
+    background: rgba(10, 10, 20, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(0, 191, 255, 0.2);
+    animation: float 8s ease-in-out infinite;
+}
+
+/* Staggered floating animations */
+main .glass-pane { animation-delay: -2s; }
+.right-sidebar .glass-pane { animation-delay: -4s; }
+
+/* Floating animation keyframes */
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
+}
+
+/* Primary button styling */
+.main-button {
+    background: linear-gradient(45deg, #4F46E5, #00BFFF);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 191, 255, 0.2);
+}
+
+.main-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+}
+
+.main-button:disabled {
+    background: #374151; /* gray-700 */
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Secondary button styling */
+.secondary-button {
+    background-color: rgba(0, 191, 255, 0.15);
+    border: 1px solid rgba(0, 191, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.secondary-button:hover {
+    background-color: rgba(0, 191, 255, 0.3);
+}
+
+/* Logout button styling */
+.logout-button {
+    background-color: rgba(220, 38, 38, 0.2);
+    border: 1px solid rgba(220, 38, 38, 0.4);
+    transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+    background-color: rgba(220, 38, 38, 0.4);
+    color: #fecaca;
+}
+
+/* Custom scrollbar for the body */
+body::-webkit-scrollbar { width: 8px; }
+body::-webkit-scrollbar-track { background: #090a0f; }
+body::-webkit-scrollbar-thumb {
+    background: rgba(0, 191, 255, 0.3);
+    border-radius: 4px;
+}
+body::-webkit-scrollbar-thumb:hover { background: rgba(0, 191, 255, 0.5); }
+
+/* Popup Styles */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.popup-content {
+    animation: none; /* Override floating animation */
+    width: 100%;
+    max-width: 500px;
+}
+
+.popup-textarea {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.25rem;
+    resize: none;
+}
+
+.popup-textarea:focus {
+    outline: none;
+}
+
+/* Map Styles */
+#map {
+    z-index: 1;
+}
+
+.custom-map-icon-container {
+    background: none;
+    border: none;
+}
+
+.custom-map-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 3px solid;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* User Location Marker */
+.user-location-marker {
+    background: none;
+    border: none;
+}
+
+.user-location-icon {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid #4F46E5;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.5);
+    z-index: 2;
+    position: relative;
+}
+
+.pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(79, 70, 229, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+    }
+}
+
+/* Locate Button */
+.locate-user-button {
+    background: none;
+    border: none;
+}
+
+.locate-user-button button {
+    animation: float 3s ease-in-out infinite;
+}
+
+.locate-user-button button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+}
+
+/* Location Messages */
+.location-message {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Custom scrollbar for friends list */
+.custom-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: rgba(79, 70, 229, 0.5);
+    border-radius: 3px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 70, 229, 0.7);
+}

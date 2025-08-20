@@ -1,0 +1,75 @@
+{
+  "name": "cown2-cosmic-social",
+  "version": "1.0.0",
+  "description": "Cosmic Social Network - Advanced Social Media Platform",
+  "main": "src/app.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "staging": "node src/app.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "build": "npm run lint && npm test",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "db:reset": "node scripts/reset.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "mongodb": "^5.7.0",
+    "redis": "^4.6.7",
+    "neo4j-driver": "^5.11.0",
+    "dotenv": "^16.3.1",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "express-session": "^1.17.3",
+    "express-rate-limit": "^6.8.1",
+    "express-slow-down": "^1.6.0",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "cors": "^2.8.5",
+    "compression": "^1.7.4",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.2",
+    "nodemailer": "^6.9.4",
+    "winston": "^3.10.0",
+    "joi": "^17.9.2",
+    "crypto": "^1.0.1",
+    "uuid": "^9.0.0",
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.6",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.6.2",
+    "supertest": "^6.3.3",
+    "eslint": "^8.45.0",
+    "prettier": "^3.0.0",
+    "@types/node": "^20.4.5"
+  },
+  "keywords": [
+    "social-network",
+    "cosmic",
+    "mysql",
+    "mongodb",
+    "redis",
+    "neo4j",
+    "real-time",
+    "websocket",
+    "3d-graphics"
+  ],
+  "author": "Cosmic Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/cown2.git"
+  }
+}
