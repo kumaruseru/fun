@@ -491,7 +491,9 @@ mysql cosmicproto_auth < backup_20250821.sql
 
 ## 📄 License
 
-Dự án này được phân phối dưới **MIT License**. Xem file `LICENSE` để biết chi tiết.
+Dự án này được phân phối dưới **GNU General Public License v3.0 (GPL-3.0)**. Xem file `LICENSE` để biết chi tiết.
+
+CosmicProto v2.0 là phần mềm tự do; bạn có thể phân phối lại và/hoặc sửa đổi theo các điều khoản của GPL-3.0.
 
 ---
 
@@ -518,7 +520,7 @@ Dự án này được phân phối dưới **MIT License**. Xem file `LICENSE` 
 
 ### **Security Issues**
 Nếu phát hiện lỗ hổng bảo mật, vui lòng **KHÔNG** tạo public issue. 
-Liên hệ trực tiếp qua email: security@cosmicproto.dev
+Liên hệ trực tiếp qua email: nghiaht281003@gmail.com
 
 ---
 
