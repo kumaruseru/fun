@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2025 CosmicProto Team
+ */
 /**
  * CosmicProto Express Server with Quantum Security
  * Main server implementation with advanced security protocols
@@ -385,12 +389,20 @@ class CosmicProtoServer {
       res.sendFile('src/ui/pages/explore/maps.html', { root: '.' });
     });
     
+    this.app.get('/map', authMiddleware.redirectToLogin, (req, res) => {
+      res.redirect('/maps');
+    });
+    
     this.app.get('/messages', authMiddleware.redirectToLogin, (req, res) => {
       res.sendFile('src/ui/pages/communication/message.html', { root: '.' });
     });
     
     this.app.get('/profile', authMiddleware.redirectToLogin, (req, res) => {
       res.sendFile('src/ui/pages/user/profile.html', { root: '.' });
+    });
+    
+    this.app.get('/settings', authMiddleware.redirectToLogin, (req, res) => {
+      res.sendFile('src/ui/pages/user/settings.html', { root: '.' });
     });
     
     // Auth pages (redirect if already logged in)

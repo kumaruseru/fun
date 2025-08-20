@@ -5,7 +5,7 @@ body {
     color: #E5E7EB; /* gray-200 */
 }
 
-/* Fixed canvas for the cosmic background */
+/* Three.js canvas background styling */
 #cosmic-bg {
     position: fixed;
     top: 0;
@@ -15,7 +15,7 @@ body {
     z-index: -10;
 }
 
-/* Glassmorphism effect for panes */
+/* Glassmorphism pane effect */
 .glass-pane {
     background: rgba(10, 10, 20, 0.5);
     backdrop-filter: blur(16px);
@@ -24,11 +24,11 @@ body {
     animation: float 8s ease-in-out infinite;
 }
 
-/* Staggered floating animations */
+/* Staggered animation for panes */
 main .glass-pane { animation-delay: -2s; }
 .right-sidebar .glass-pane { animation-delay: -4s; }
 
-/* Floating animation keyframes */
+/* Floating animation for panes */
 @keyframes float {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
@@ -37,11 +37,10 @@ main .glass-pane { animation-delay: -2s; }
 
 /* Secondary button styling */
 .secondary-button {
-    background-color: rgba(0, 191, 255, 0.15);
-    border: 1px solid rgba(0, 191, 255, 0.3);
-    transition: all 0.3s ease;
+     background-color: rgba(0, 191, 255, 0.15);
+     border: 1px solid rgba(0, 191, 255, 0.3);
+     transition: all 0.3s ease;
 }
-
 .secondary-button:hover {
     background-color: rgba(0, 191, 255, 0.3);
 }
@@ -52,13 +51,12 @@ main .glass-pane { animation-delay: -2s; }
     border: 1px solid rgba(220, 38, 38, 0.4);
     transition: all 0.3s ease;
 }
-
 .logout-button:hover {
     background-color: rgba(220, 38, 38, 0.4);
     color: #fecaca;
 }
 
-/* Custom scrollbar for the body */
+/* Custom scrollbar styling */
 body::-webkit-scrollbar { width: 8px; }
 body::-webkit-scrollbar-track { background: #090a0f; }
 body::-webkit-scrollbar-thumb {

@@ -1,271 +1,204 @@
-// --- 3D Cosmic Background Script ---
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-camera.position.z = 1;
-const renderer = new THREE.WebGLRenderer({
-    canvas: document.getElementById('cosmic-bg'),
-    antialias: true,
-});
-renderer.setSize(window.innerWidth, window.innerHeight);
+const { useState, useEffect, useRef } = React;
 
-// Create starfield
-const starGeo = new THREE.BufferGeometry();
-const starCount = 6000;
-const posArray = new Float32Array(starCount * 3);
-for (let i = 0; i < starCount * 3; i++) {
-    posArray[i] = (Math.random() - 0.5) * 600;
-}
-starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-const starMaterial = new THREE.PointsMaterial({
-    size: 0.5,
-    color: 0xaaaaaa,
-    transparent: true,
-});
-const stars = new THREE.Points(starGeo, starMaterial);
-scene.add(stars);
+const ThreeBackground = () => {
+    useEffect(() => {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+        camera.position.z = 1;
+        const renderer = new THREE.WebGLRenderer({
+            canvas: document.getElementById('cosmic-bg'),
+            antialias: true,
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 6000;
+        const posArray = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 600;
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const starMaterial = new THREE.PointsMaterial({
+            size: 0.5,
+            color: 0xaaaaaa,
+            transparent: true,
+        });
+        const stars = new THREE.Points(starGeo, starMaterial);
+        scene.add(stars);
+        let mouseX = 0;
+        let mouseY = 0;
+        const onMouseMove = (event) => {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        };
+        document.addEventListener('mousemove', onMouseMove);
+        const clock = new THREE.Clock();
+        const animate = () => {
+            requestAnimationFrame(animate);
+            stars.rotation.y = -mouseX * 0.00005;
+            stars.rotation.x = -mouseY * 0.00005;
+            camera.position.z = 1 + window.scrollY * 0.001;
+            renderer.render(scene, camera);
+        };
+        animate();
+        const onResize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+        window.addEventListener('resize', onResize);
 
-// Mouse move interaction
-let mouseX = 0;
-let mouseY = 0;
-document.addEventListener('mousemove', (event) => {
-    mouseX = event.clientX;
-    mouseY = event.clientY;
-});
+        return () => {
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('mousemove', onMouseMove);
+        }
+    }, []);
 
-// Animation loop
-const clock = new THREE.Clock();
-const animate = () => {
-    requestAnimationFrame(animate);
-    const elapsedTime = clock.getElapsedTime();
-    stars.rotation.y = -mouseX * 0.00005;
-    stars.rotation.x = -mouseY * 0.00005;
-    // Parallax effect on scroll
-    camera.position.z = 1 + (document.documentElement.scrollTop || document.body.scrollTop) * 0.001;
-    renderer.render(scene, camera);
+    return null;
 };
-animate();
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+const MapComponent = ({ friends }) => {
+    const mapRef = useRef(null);
 
-// --- Leaflet Map Initialization ---
-document.addEventListener('DOMContentLoaded', function() {
-    const mapElement = document.getElementById('map');
-    if (!mapElement) {
-        console.error('Map element not found');
-        return;
-    }
+    useEffect(() => {
+        if (!mapRef.current) {
+            mapRef.current = L.map('map', {
+                zoomControl: false
+            }).setView([10.762622, 106.660172], 13);
 
-    const map = L.map('map', {
-        zoomControl: false // Disable the default zoom control
-    }).setView([10.762622, 106.660172], 13); // Centered on Ho Chi Minh City
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(mapRef.current);
 
-    // Add OpenStreetMap tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+            friends.forEach(friend => {
+                const customIcon = L.divIcon({
+                    className: 'custom-map-icon-container',
+                    html: `<img src="${friend.avatar}" class="custom-map-icon" style="border-color: ${friend.color};">`,
+                    iconSize: [48, 48],
+                    iconAnchor: [24, 48]
+                });
+                
+                const popupContent = `
+                    <div class="text-center">
+                        <b class="text-lg">${friend.name}</b><br>
+                        ${friend.location}<br>
+                        ${friend.speed > 0 ? `Di chuyển: ${friend.speed} km/h` : `Dừng • ${friend.time}`}<br>
+                        Pin: ${friend.battery}%
+                    </div>
+                `;
 
-    // Force map to resize after a short delay
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 100);
-
-    // User location marker
-    let userMarker = null;
-    
-    // Function to get user's current location
-    function getUserLocation() {
-        if ('geolocation' in navigator) {
-            console.log('Getting user location...');
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const accuracy = position.coords.accuracy;
-                    
-                    console.log(`User location: ${lat}, ${lon} (accuracy: ${accuracy}m)`);
-                    
-                    // Create custom icon for user location
-                    const userIcon = L.divIcon({
-                        className: 'user-location-marker',
-                        html: `<div class="user-location-icon">
-                                <img src="https://placehold.co/64x64/4F46E5/FFFFFF?text=YOU" class="user-avatar"/>
-                                <div class="pulse"></div>
-                               </div>`,
-                        iconSize: [60, 60],
-                        iconAnchor: [30, 30]
-                    });
-                    
-                    // Remove old user marker if exists
-                    if (userMarker) {
-                        map.removeLayer(userMarker);
-                    }
-                    
-                    // Add user marker
-                    userMarker = L.marker([lat, lon], {icon: userIcon})
-                        .addTo(map)
-                        .bindPopup(`
-                            <div class="text-center">
-                                <b class="text-lg text-blue-500">Vị trí của bạn</b><br>
-                                <small>Độ chính xác: ~${Math.round(accuracy)}m</small><br>
-                                <small>Tọa độ: ${lat.toFixed(6)}, ${lon.toFixed(6)}</small>
-                            </div>
-                        `);
-                    
-                    // Center map on user location
-                    map.setView([lat, lon], 15);
-                    
-                    // Show success message
-                    showLocationMessage('✅ Đã tìm thấy vị trí của bạn!', 'success');
-                },
-                function(error) {
-                    console.error('Geolocation error:', error);
-                    let errorMessage = 'Không thể lấy vị trí của bạn. ';
-                    
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            errorMessage += 'Vui lòng cho phép truy cập vị trí.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage += 'Thông tin vị trí không khả dụng.';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage += 'Hết thời gian chờ.';
-                            break;
-                        default:
-                            errorMessage += 'Lỗi không xác định.';
-                            break;
-                    }
-                    
-                    showLocationMessage(errorMessage, 'error');
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 300000 // 5 minutes
-                }
-            );
-        } else {
-            showLocationMessage('❌ Trình duyệt không hỗ trợ định vị.', 'error');
+                L.marker([friend.lat, friend.lon], { icon: customIcon })
+                  .addTo(mapRef.current)
+                  .bindPopup(popupContent);
+            });
         }
-    }
-    
-    // Function to show location messages
-    function showLocationMessage(message, type) {
-        // Remove existing message if any
-        const existingMessage = document.querySelector('.location-message');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
-        
-        // Create message element
-        const messageElement = document.createElement('div');
-        messageElement.className = `location-message fixed top-4 right-4 z-50 p-4 rounded-lg text-white font-semibold shadow-lg ${
-            type === 'success' ? 'bg-green-600' : 'bg-red-600'
-        }`;
-        messageElement.textContent = message;
-        
-        document.body.appendChild(messageElement);
-        
-        // Auto remove after 3 seconds
-        setTimeout(() => {
-            if (messageElement.parentNode) {
-                messageElement.remove();
-            }
-        }, 3000);
-    }
-    
-    // Add locate user button to map
-    const locateButton = L.control({position: 'bottomright'});
-    
-    locateButton.onAdd = function(map) {
-        const div = L.DomUtil.create('div', 'locate-user-button');
-        div.innerHTML = `
-            <button onclick="getUserLocation()" class="bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-colors" title="Tìm vị trí của tôi">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                    <circle cx="12" cy="10" r="3"></circle>
-                </svg>
-            </button>
-        `;
-        
-        // Prevent map events on button click
-        L.DomEvent.disableClickPropagation(div);
-        
-        return div;
-    };
-    
-    locateButton.addTo(map);
-    
-    // Make getUserLocation available globally
-    window.getUserLocation = getUserLocation;
-    
-    // Auto-locate user on page load
-    getUserLocation();
+    }, [friends]);
 
-    // --- Friend Data & Markers ---
+    return <div id="map" className="w-full h-full"></div>;
+};
+
+const App = () => {
     const friends = [
         { name: 'Cosmo Explorer', lat: 10.7769, lon: 106.7009, avatar: 'https://placehold.co/64x64/8A2BE2/FFFFFF?text=C', color: '#a855f7', location: 'Tại Đài thiên văn', speed: 5, battery: 80, time: '15 phút' },
         { name: 'Galaxy Gazer', lat: 10.75, lon: 106.66, avatar: 'https://placehold.co/64x64/00BFFF/FFFFFF?text=G', color: '#38bdf8', location: 'Đang ở nhà', speed: 0, battery: 95, time: '3 giờ' },
         { name: 'Starlight', lat: 10.78, lon: 106.68, avatar: 'https://placehold.co/64x64/FFAA00/FFFFFF?text=S', color: '#f59e0b', location: 'Quán cà phê Stardust', speed: 0, battery: 55, time: '2 giờ trước' }
     ];
 
-    const friendsListContainer = document.getElementById('friends-list');
-    if (!friendsListContainer) {
-        console.error('Friends list container not found');
-        return;
-    }
+    return (
+        <>
+            <ThreeBackground />
+            <div className="relative z-10 container mx-auto grid grid-cols-12 gap-8 px-4 py-8">
+                <aside className="col-span-12 lg:col-span-3 h-fit sticky top-8">
+                    <div className="glass-pane p-4 rounded-2xl space-y-2">
+                        <a href="/profile" className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-800/50 transition-colors">
+                            <img src="https://placehold.co/48x48/4F46E5/FFFFFF?text=A" alt="User Avatar" className="w-12 h-12 rounded-full border-2 border-indigo-500"/>
+                            <div>
+                                <h3 className="font-bold text-lg text-white">Alex Starr</h3>
+                                <p className="text-sm text-gray-400">@alexstarr</p>
+                            </div>
+                        </a>
+                        <hr className="border-gray-700/50"/>
+                        <nav className="flex flex-col space-y-2">
+                            <a href="/home" className="flex items-center gap-3 px-4 py-3 rounded-lg font-semibold hover:bg-gray-800/50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                <span>Trang chủ</span>
+                            </a>
+                            <a href="/discovery" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                <span>Khám phá</span>
+                            </a>
+                            <a href="/messages" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                <span>Tin nhắn</span>
+                            </a>
+                            <a href="/maps" className="flex items-center gap-3 px-4 py-3 rounded-lg text-white font-semibold bg-gray-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                <span>Bản đồ</span>
+                            </a>
+                             <a href="/profile" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <span>Hồ sơ</span>
+                            </a>
+                            <a href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                <span>Cài đặt</span>
+                            </a>
+                        </nav>
+                        <hr className="border-gray-700/50 pt-2"/>
+                        <button 
+                            onClick={() => {
+                                if(confirm('Bạn có chắc muốn đăng xuất?')) {
+                                    window.location.href = '/login';
+                                }
+                            }}
+                            className="w-full logout-button font-bold py-3 rounded-lg flex items-center justify-center gap-3"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                            <span>Đăng xuất</span>
+                        </button>
+                    </div>
+                </aside>
 
-    // Loop through friends to create map markers and list items
-    friends.forEach(friend => {
-        // Create custom icon for the map marker
-        const customIcon = L.divIcon({
-            className: 'custom-map-icon-container',
-            html: `<img src="${friend.avatar}" class="custom-map-icon" style="border-color: ${friend.color};">`,
-            iconSize: [48, 48],
-            iconAnchor: [24, 48]
-        });
-        
-        // Create popup content for the marker
-        const popupContent = `
-            <div class="text-center">
-                <b class="text-lg">${friend.name}</b><br>
-                ${friend.location}<br>
-                ${friend.speed > 0 ? `Di chuyển: ${friend.speed} km/h` : `Dừng • ${friend.time}`}<br>
-                Pin: ${friend.battery}%
+                <main className="col-span-12 lg:col-span-9">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 h-[calc(100vh-4rem)]">
+                        <div className="md:col-span-2 h-full">
+                            <div className="glass-pane rounded-2xl w-full h-full overflow-hidden relative">
+                                <MapComponent friends={friends} />
+                            </div>
+                        </div>
+                        <div className="md:col-span-1 h-full">
+                            <div className="glass-pane rounded-2xl w-full h-full flex flex-col">
+                                <div className="p-4 border-b border-gray-700/50">
+                                    <h2 className="text-xl font-bold text-white">Bạn bè</h2>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
+                                    {friends.map(friend => (
+                                        <div key={friend.name} className={`flex items-center justify-between ${friend.time.includes('trước') ? 'opacity-60' : ''}`}>
+                                            <div className="flex items-center gap-3">
+                                                <img src={friend.avatar} alt="User Avatar" className="w-12 h-12 rounded-full"/>
+                                                <div>
+                                                    <p className="font-semibold text-white">{friend.name}</p>
+                                                    <p className="text-xs text-gray-400">
+                                                        {friend.speed > 0 ? `Đang di chuyển - ${friend.speed} km/h` : `${friend.location} • ${friend.time}`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                 <span className="text-xs text-gray-400">{friend.battery}%</span>
+                                                 <button className="p-2 rounded-full hover:bg-purple-500/30 transition-colors">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z"/><path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z"/><path d="m18.5 8.5 3.5 3.5-3.5 3.5-3.5-3.5 3.5-3.5Z"/><path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
             </div>
-        `;
+        </>
+    );
+};
 
-        // Add marker to the map
-        L.marker([friend.lat, friend.lon], {icon: customIcon})
-            .addTo(map)
-            .bindPopup(popupContent);
-
-        // Create a list item for the sidebar
-        const friendElement = document.createElement('div');
-        friendElement.className = `flex items-center justify-between ${friend.time.includes('trước') ? 'opacity-60' : ''}`;
-        friendElement.innerHTML = `
-            <div class="flex items-center gap-3">
-                <img src="${friend.avatar}" alt="User Avatar" class="w-12 h-12 rounded-full"/>
-                <div>
-                    <p class="font-semibold text-white">${friend.name}</p>
-                    <p class="text-xs text-gray-400">
-                        ${friend.speed > 0 ? `Đang di chuyển - ${friend.speed} km/h` : `${friend.location} • ${friend.time}`}
-                    </p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400">${friend.battery}%</span>
-                    <button class="p-2 rounded-full hover:bg-purple-500/30 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z"/><path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z"/><path d="m18.5 8.5 3.5 3.5-3.5 3.5-3.5-3.5 3.5-3.5Z"/><path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z"/></svg>
-                    </button>
-            </div>
-        `;
-        friendsListContainer.appendChild(friendElement);
-    });
-});
+ReactDOM.render(<App />, document.getElementById('root'));

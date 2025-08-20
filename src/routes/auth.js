@@ -155,43 +155,23 @@ router.post('/register',
       }
       
       console.log('✅ Basic validation passed');
-      console.log('📊 Calling direct MySQL test...');
+      console.log('📊 Using SecureDatabaseLayerV2 createUser...');
       
-      // DIRECT MYSQL TEST - bypass complex CosmicProto
-      const mysql = require('mysql2/promise');
-      const connection = await mysql.createConnection({
-        host: process.env.MYSQL_HOST,
-        port: parseInt(process.env.MYSQL_PORT),
-        user: process.env.MYSQL_USER,
-        password: process.env.MYSQL_PASSWORD,
-        database: process.env.MYSQL_DATABASE,
-        ssl: { rejectUnauthorized: false }
+      // Use proper createUser method with salt and encryption
+      const userResult = await authController.secureDB.createUser({
+        firstName,
+        lastName,
+        email,
+        password,
+        phone: req.body.phone
       });
-      
-      console.log('✅ Direct MySQL connection established');
-      
-      const [result] = await connection.execute(
-        'INSERT INTO users (email, first_name, last_name, password_hash) VALUES (?, ?, ?, ?)',
-        [email, firstName, lastName, password + '_hashed']
-      );
-      
-      console.log('✅ Direct MySQL insert successful, ID:', result.insertId);
-      await connection.end();
       
       return res.status(200).json({
         success: true,
-        message: 'User registered successfully with direct MySQL',
-        user: {
-          id: result.insertId,
-          email: email,
-          firstName: firstName,
-          lastName: lastName
-        },
-        databaseStorage: {
-          mysql: { success: true, id: result.insertId }
-        },
-        timestamp: Date.now(),
-        operationId: req.requestId
+        message: 'User registered successfully with CosmicProto security',
+        user: userResult,
+        requestId: req.requestId,
+        timestamp: Date.now()
       });
       
     } catch (error) {

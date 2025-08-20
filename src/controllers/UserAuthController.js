@@ -3,7 +3,7 @@
  * Integrates quantum authentication with secure database operations
  */
 
-const SecureDatabaseLayer = require('../security/cosmicproto/database/SecureDatabaseLayer');
+const { SecureDatabaseLayerV2 } = require('../core/SecureDatabaseLayerV2');
 const CosmicProto = require('../security/cosmicproto/CosmicProto');
 const crypto = require('crypto');
 

@@ -8,7 +8,7 @@ const MessageEncryption = require('./encryption/MessageEncryption');
 const AISecurityIntelligence = require('./ai/AISecurityIntelligence');
 const BlockchainIntegrity = require('./blockchain/BlockchainIntegrity');
 const ZeroKnowledgeAuth = require('./auth/ZeroKnowledgeAuth');
-const SecureDatabaseLayer = require('./database/SecureDatabaseLayer');
+const { SecureDatabaseLayerV2 } = require('../../core/SecureDatabaseLayerV2');
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
@@ -52,7 +52,7 @@ class CosmicProto extends EventEmitter {
     this.aiSecurity = new AISecurityIntelligence();
     this.blockchain = new BlockchainIntegrity();
     this.zkAuth = new ZeroKnowledgeAuth();
-    this.secureDB = new SecureDatabaseLayer({
+    this.secureDB = new SecureDatabaseLayerV2({
       encryptionLevel: 'maximum',
       quantumEncryption: true
     });
