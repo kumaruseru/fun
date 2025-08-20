@@ -22,6 +22,7 @@ const cookieParser = require('cookie-parser');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
 
 // Import middleware
 const authMiddleware = require('./middleware/auth');
@@ -475,8 +476,10 @@ class CosmicProtoServer {
     // Authentication routes
     this.app.use('/api/auth', authRoutes);
     
+    // User routes (protected)
+    this.app.use('/api/user', userRoutes);
+    
     // TODO: Add other route modules
-    // this.app.use('/api/users', userRoutes);
     // this.app.use('/api/messages', messageRoutes);
     // this.app.use('/api/posts', postRoutes);
     

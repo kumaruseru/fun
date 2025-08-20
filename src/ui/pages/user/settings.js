@@ -1,11 +1,14 @@
-// --- Mock User Data ---
-const currentUser = {
-    name: "Nghĩa Trọng",
-    username: "@nghiatrong",
-    avatar: "https://placehold.co/48x48/4F46E5/FFFFFF?text=NT",
-    email: "nghiatrong.dev@cosmic.net",
-    bio: "Nhà phát triển vũ trụ | Người yêu thích thiên văn học."
-};
+// --- User Data Management with UserDataManager ---
+let currentUser = window.userDataManager.getUser();
+
+// Subscribe to user data changes
+window.userDataManager.subscribe((userData, isLoading) => {
+    currentUser = userData;
+    // Re-render when data changes
+    if (!isLoading) {
+        ReactDOM.render(<App />, document.getElementById('root'));
+    }
+});
 
 // --- Settings Components ---
 
@@ -139,7 +142,7 @@ const App = () => {
     );
 }
 
-// Render the React app
+// Render the React app initially
 ReactDOM.render(<App />, document.getElementById('root'));
 
 // --- 3D Cosmic Background Script ---
